@@ -5,7 +5,11 @@ import os.path
 import pickle
 import face_recognition
 from face_recognition.face_recognition_cli import image_files_in_folder
-from .mlconfig import *
+from datetime import date
+
+TRAIN_DIR = '../Data/train'
+MODEL_SAVE_PATH_KNN = 'models/knn/'
+MODEL_SAVE_PATH_SVC = 'models/svc/'
 
 
 def get_encodings():
@@ -30,8 +34,15 @@ def get_encodings():
 
 
 def save_clf(clf, clf_name):
-    if MODEL_SAVE_PATH is not None:
-        with open(MODEL_SAVE_PATH + '/' + clf_name, 'wb') as f:
+    day = date.today()
+
+    if clf_name == 'knn':
+        path = MODEL_SAVE_PATH_KNN + day.strftime("%m-%d-%y") + '-model.clf'
+    else:
+        path = MODEL_SAVE_PATH_SVC + day.strftime("%m-%d-%y") + '-model.clf'
+
+    if path is not None:
+        with open(path, 'wb') as f:
             pickle.dump(clf, f)
 
 
