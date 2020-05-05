@@ -1,0 +1,3 @@
+
+MODEL_SAVE_PATH = ""
+TRAIN_DIR = ""
