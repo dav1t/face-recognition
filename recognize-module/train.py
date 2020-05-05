@@ -1,5 +1,5 @@
 import math
-from sklearn import neighbors
+from sklearn import neighbors, svm
 import os
 import os.path
 import pickle
@@ -7,29 +7,10 @@ import face_recognition
 from face_recognition.face_recognition_cli import image_files_in_folder
 from .mlconfig import *
 
-def train(train_dir, model_save_path=None, n_neighbors=None, knn_algo='ball_tree', verbose=False):
-    """
-    Trains a k-nearest neighbors classifier for face recognition.
-    :param train_dir: directory that contains a sub-directory for each known person, with its name.
-     (View in source code to see train_dir example tree structure)
-     Structure:
-        <train_dir>/
-        ├── <person1>/
-        │   ├── <somename1>.jpeg
-        │   ├── <somename2>.jpeg
-        │   ├── ...
-        ├── <person2>/
-        │   ├── <somename1>.jpeg
-        │   └── <somename2>.jpeg
-        └── ...
-    :param model_save_path: (optional) path to save model on disk
-    :param n_neighbors: (optional) number of neighbors to weigh in classification. Chosen automatically if not specified
-    :param knn_algo: (optional) underlying data structure to support knn.default is ball_tree
-    :param verbose: verbosity of training
-    :return: returns knn classifier that was trained on the given data.
-    """
-    X = []
-    y = []
+
+def get_encodings():
+    encodings = []
+    persons = []
 
     # Loop through each person in the training set
     for class_dir in os.listdir(TRAIN_DIR):
@@ -41,29 +22,41 @@ def train(train_dir, model_save_path=None, n_neighbors=None, knn_algo='ball_tree
             image = face_recognition.load_image_file(img_path)
             face_bounding_boxes = face_recognition.face_locations(image)
 
-            if len(face_bounding_boxes) != 1:
-                # If there are no people (or too many people) in a training image, skip the image.
-                if verbose:
-                    print("Image {} not suitable for training: {}".format(img_path, "Didn't find a face" if len(
-                        face_bounding_boxes) < 1 else "Found more than one face"))
-            else:
-                # Add face encoding for current image to the training set
-                X.append(face_recognition.face_encodings(image, known_face_locations=face_bounding_boxes)[0])
-                y.append(class_dir)
+            # Checking if image contains one face
+            if len(face_bounding_boxes) == 1:
+                encodings.append(face_recognition.face_encodings(image, known_face_locations=face_bounding_boxes)[0])
+                persons.append(class_dir)
+    return encodings, persons
+
+
+def save_clf(clf, clf_name):
+    if MODEL_SAVE_PATH is not None:
+        with open(MODEL_SAVE_PATH + '/' + clf_name, 'wb') as f:
+            pickle.dump(clf, f)
+
+
+def train_knn(knn_algo='ball_tree'):
+    encodings, persons = get_encodings()
 
     # Determine how many neighbors to use for weighting in the KNN classifier
-    if n_neighbors is None:
-        n_neighbors = int(round(math.sqrt(len(X))))
-        if verbose:
-            print("Chose n_neighbors automatically:", n_neighbors)
+    n_neighbors = int(round(math.sqrt(len(encodings))))
 
     # Create and train the KNN classifier
     knn_clf = neighbors.KNeighborsClassifier(n_neighbors=n_neighbors, algorithm=knn_algo, weights='distance')
-    knn_clf.fit(X, y)
+    knn_clf.fit(encodings, persons)
 
-    # Save the trained KNN classifier
-    if MODEL_SAVE_PATH is not None:
-        with open(MODEL_SAVE_PATH, 'wb') as f:
-            pickle.dump(knn_clf, f)
+    save_clf(knn_clf, 'knn')
 
     return knn_clf
+
+
+def train_svc():
+    encodings, persons = get_encodings()
+
+    # Create and train the SVC classifier
+    svc_clf = svm.SVC(gamma='scale')
+    svc_clf.fit(encodings, persons)
+
+    save_clf(svc_clf, 'svc')
+
+    return svc_clf
